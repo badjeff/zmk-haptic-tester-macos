@@ -14,15 +14,78 @@
 #include "hidapi.h"
 
 #define ZMK_HAPTIC_HID_REPORT_ID 0x04
-#define ZMK_HAPTIC_FORCE 128
-#define ZMK_HAPTIC_DURATION_MS 20
+#define ZMK_HAPTIC_FORCE 1
+#define ZMK_HAPTIC_DURATION_MS 16
+
+@interface AppController : NSObject <NSApplicationDelegate> {
+    NSRunningApplication *currentApp;
+    struct hid_device_ *dev;
+}
+@property (retain) NSRunningApplication *currentApp;
+@end
+
+@implementation AppController 
+@synthesize currentApp;
+- (id)init {
+    if ((self = [super init])) {
+        [[[NSWorkspace sharedWorkspace] notificationCenter]
+            addObserver:self selector:@selector(activeAppDidChange:)
+            name:NSWorkspaceDidActivateApplicationNotification object:nil];
+    }
+    self.dev = NULL;
+    return self;
+}
+- (void)setDev:(struct hid_device_ *)_dev {
+    dev = _dev;
+}
+- (void)dealloc {
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
+    [super dealloc];
+}
+- (void)activeAppDidChange:(NSNotification *)notification {
+    self.currentApp = [[notification userInfo] objectForKey:NSWorkspaceApplicationKey];
+    NSString* bundleId = [currentApp bundleIdentifier];
+    NSLog(@"%@", bundleId);
+    uint8_t buf[3] = { 
+        ZMK_HAPTIC_HID_REPORT_ID,
+        ZMK_HAPTIC_FORCE + 1,
+        ZMK_HAPTIC_DURATION_MS
+    };
+    hid_write(dev, buf, 3);
+}
+- (void)runloop:(NSObject *)userInfo {
+    #define OFFLIST_LEN 2
+    static float offList[OFFLIST_LEN][2] = {
+        {4.0, 2.0},
+        {7.5, 12.0}
+    };
+    static float x, y;
+    id pool = [[NSAutoreleasePool alloc] init];
+    NSCursor *c = [NSCursor currentSystemCursor];
+    NSPoint p = [c hotSpot];
+    if(x != p.x || y != p.y) {
+        // printf("%f, %f\n", p.x, p.y);
+        x = p.x;
+        y = p.y;
+        for (int i = 0; i < OFFLIST_LEN; i++) {
+            if(x == offList[i][0] && y == offList[i][1]) {
+                // latch 0
+                continue;
+            }
+        }
+        // latch 1
+        uint8_t buf[3] = {
+            ZMK_HAPTIC_HID_REPORT_ID,
+            ZMK_HAPTIC_FORCE + 0,
+            ZMK_HAPTIC_DURATION_MS
+        };
+        hid_write(dev, buf, 3);
+    }
+    [pool release];
+}
+@end
 
 #define MAX_STR 1024  // for manufacturer, product strings
-#define OFFLIST_LEN 2
-float offList[OFFLIST_LEN][2] = {
-    {4.0, 2.0},
-    {7.5, 12.0}
-};
 
 static void print_usage(char *myname)
 {
@@ -156,30 +219,18 @@ int main(int argc, char* argv[])
                 if( !dev ) {
                     msg("Error on send: no device opened.\n"); break;
                 }
-                for(;;) {
-                    static float x, y;
-                    id pool = [[NSAutoreleasePool alloc] init];
-                    NSCursor *c = [NSCursor currentSystemCursor];
-                    NSPoint p = [c hotSpot];
-                    if(x != p.x || y != p.y) {
-                        // printf("%f, %f\n", p.x, p.y);
-                        x = p.x;
-                        y = p.y;
-                        for (int i = 0; i < OFFLIST_LEN; i++) {
-                            if(x == offList[i][0] && y == offList[i][1]) {
-                                // latch 0
-                                continue;
-                            }
-                        }
-                        // latch 1
-                        uint8_t buf[3] = { 
-                            ZMK_HAPTIC_HID_REPORT_ID,
-                            ZMK_HAPTIC_FORCE, ZMK_HAPTIC_DURATION_MS
-                        };
-                        res = hid_write(dev, buf, 3);
-                    }
-                    [pool release];
-                }
+
+                NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+                AppController *appController = [[AppController alloc] init];
+                [appController setDev:dev];
+                NSDate *now = [[NSDate alloc] init];
+                NSTimer *timer = [[NSTimer alloc] initWithFireDate:now interval:.01
+                    target:appController selector:@selector(runloop:)
+                    userInfo:nil repeats:YES];
+                NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
+                [runLoop addTimer:timer forMode:NSDefaultRunLoopMode];
+                [runLoop run]; // this shall block until timer stop
+                [pool release];
 
             }
 
