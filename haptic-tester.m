@@ -93,6 +93,7 @@ static void print_usage(char *myname)
 "Usage: \n"
 "  %s <cmd> [options]\n"
 "where <cmd> is one of:\n"
+"  --product <string>          Filter by product string \n"
 "  --serial <string>           Filter by serial number \n"
 "  --list-detail               List HID devices w/ details (by filters)\n"
 "  --start-haptic-cursor       Start monitoring you cursor and send report to ZMK device\n"
@@ -117,6 +118,7 @@ static void print_usage(char *myname)
 // local states for the "cmd" option variable
 enum {
     CMD_NONE = 0,
+    CMD_PRODUCT,
     CMD_SERIALNUMBER,
     CMD_LIST_DETAIL,
     CMD_START_HAPTIC_CURSOR,
@@ -137,6 +139,7 @@ int main(int argc, char* argv[])
     int i;
     int cmd = CMD_NONE;     //
 
+    wchar_t product_wstr[MAX_STR] = {L'\0'}; // serial number string rto search for, if any
     wchar_t serial_wstr[MAX_STR/4] = {L'\0'}; // serial number string rto search for, if any
     char devpath[MAX_STR];   // path to open, if filter by usage
 
@@ -149,6 +152,7 @@ int main(int argc, char* argv[])
 
     struct option longoptions[] =
         {
+         {"product",      required_argument, &cmd,   CMD_PRODUCT},
          {"serial",       required_argument, &cmd,   CMD_SERIALNUMBER},
          {"list",  no_argument,       &cmd,   CMD_LIST_DETAIL},
          {"start-haptic-cursor", no_argument, &cmd, CMD_START_HAPTIC_CURSOR},
@@ -166,7 +170,10 @@ int main(int argc, char* argv[])
         switch(opt) {
         case 0:                   // long opts with no short opts
 
-            if( cmd == CMD_SERIALNUMBER ) {
+            if( cmd == CMD_PRODUCT ) {
+                swprintf( product_wstr, sizeof(product_wstr), L"%s", optarg); // convert to wchar_t*
+            }
+            else if( cmd == CMD_SERIALNUMBER ) {
                 swprintf( serial_wstr, sizeof(serial_wstr), L"%s", optarg); // convert to wchar_t*
             }
             else if( cmd == CMD_LIST_DETAIL ) {
@@ -175,7 +182,9 @@ int main(int argc, char* argv[])
                 devs = hid_enumerate(0,0); // 0,0 = find all devices
                 cur_dev = devs;
                 while (cur_dev) {
-                    if( (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0) ) {
+                    if((product_wstr[0]==L'\0' || wcscmp(cur_dev->product_string, product_wstr)==0) &&
+                       (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0)
+                    ) {
                         printf("%04X/%04X: %ls - %ls\n",
                                 cur_dev->vendor_id, cur_dev->product_id,
                                 cur_dev->manufacturer_string, cur_dev->product_string );
@@ -196,7 +205,9 @@ int main(int argc, char* argv[])
                 devs = hid_enumerate(0, 0); // 0,0 = find all devices
                 cur_dev = devs;
                 while (cur_dev) {
-                    if( (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0) ) {
+                    if((product_wstr[0]==L'\0' || wcscmp(cur_dev->product_string, product_wstr)==0) &&
+                       (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0)
+                    ) {
                         strncpy(devpath, cur_dev->path, MAX_STR); // save it!
                     }
                     cur_dev = cur_dev->next;
