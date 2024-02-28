@@ -4,7 +4,7 @@ This is a command line app that demo to give haptic feedback on mouse cursor sta
 
 This is proof of concept of sending feedback to hardware HID peripheral via HID-over-GATT on [ZMK Firmware](https://zmk.dev/). Developers are allow to design shield with actuators on baord to reflect haptic feedback by accepting HID Send Report from host, or an internal events such as `zmk_layer_state_changed` being triggered. Actuators would allow be binded in keymap layer setup in behaviors.
 
-The hardware must be powered by my [ZMK Firmware](https://zmk.dev/) fork from [this branch](https://github.com/badjeff/zmk/tree/feat/pointers-move-scroll). Or, you might cherrypick [this commit](https://github.com/zmkfirmware/zmk/commit/aae156423fbd7c9e0d805aa81caf8d8c9efc8ce1) and [this commit](https://github.com/zmkfirmware/zmk/commit/ea27e6516b2b5c44df5fa2c2d6f08d49d4b78686) into [ZMK Pull Request #2027](https://github.com/zmkfirmware/zmk/pull/2027).
+The hardware must be powered by [ZMK Firmware](https://zmk.dev/) with cherrypicked [this commit](https://github.com/zmkfirmware/zmk/commit/aae156423fbd7c9e0d805aa81caf8d8c9efc8ce1) and [this commit](https://github.com/zmkfirmware/zmk/commit/ea27e6516b2b5c44df5fa2c2d6f08d49d4b78686) into [ZMK Pull Request #2027](https://github.com/zmkfirmware/zmk/pull/2027).
 
 ### This is an EXPERIMENTAL feature and it is not available on official ZMK main branch
 
