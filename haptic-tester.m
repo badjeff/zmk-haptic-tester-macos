@@ -94,20 +94,21 @@ static void print_usage(char *myname)
 "  %s <cmd> [options]\n"
 "where <cmd> is one of:\n"
 "  --product <string>          Filter by product string \n"
+"  --usagePage <string>        Filter by usage page \n"
 "  --serial <string>           Filter by serial number \n"
-"  --list-detail               List HID devices w/ details (by filters)\n"
-"  --start-haptic-cursor       Start monitoring you cursor and send report to ZMK device\n"
+"  --list                      List HID devices w/ details (by filters)\n"
+"  --start                     Start monitoring you cursor and send report to ZMK device\n"
 "\n"
 "Notes: \n"
 " . Commands are executed in order. \n"
-" . --vidpid, --usage, --usagePage, --serial act as filters to --open and --list \n"
+" . --product, --usagePage, --serial act as filters to --list \n"
 "\n"
 "Examples: \n"
 ". List all devices \n"
-"   hidapitester --list \n"
-". Search the ZMK device with haptic feedback enabling, find the serial number \n"
-". Start haptic cursur state \n"
-"   hidapitester --serial 0D7FEFEE68D8C54D --open --start-haptic-cursor \n"
+"   haptic-tester --list \n"
+". Search the ZMK device with haptic feedback enabling, find the product id and usage page \n"
+". Start haptic cursor state \n"
+"   haptic-tester --product ztrackball --usagePage 0xFF0C --start \n"
 ". If see 'Error: could not open device', open 'System Settings -> Security' and \n"
 "  grant the permissoin to Termianl. And run it again with 'sudo' \n"
 "\n"
@@ -119,6 +120,7 @@ static void print_usage(char *myname)
 enum {
     CMD_NONE = 0,
     CMD_PRODUCT,
+    CMD_USAGEPAGE,
     CMD_SERIALNUMBER,
     CMD_LIST_DETAIL,
     CMD_START_HAPTIC_CURSOR,
@@ -139,6 +141,7 @@ int main(int argc, char* argv[])
     int i;
     int cmd = CMD_NONE;     //
 
+    uint16_t usage_page = 0; // usagePage to search for, if any
     wchar_t product_wstr[MAX_STR] = {L'\0'}; // serial number string rto search for, if any
     wchar_t serial_wstr[MAX_STR/4] = {L'\0'}; // serial number string rto search for, if any
     char devpath[MAX_STR];   // path to open, if filter by usage
@@ -146,16 +149,17 @@ int main(int argc, char* argv[])
     setbuf(stdout, NULL);  // turn off buffering of stdout
 
     if(argc < 2){
-        print_usage( "hidapitester" );
+        print_usage( "haptic-tester" );
         exit(1);
     }
 
     struct option longoptions[] =
         {
          {"product",      required_argument, &cmd,   CMD_PRODUCT},
+         {"usagePage",    required_argument, &cmd,   CMD_USAGEPAGE},
          {"serial",       required_argument, &cmd,   CMD_SERIALNUMBER},
          {"list",  no_argument,       &cmd,   CMD_LIST_DETAIL},
-         {"start-haptic-cursor", no_argument, &cmd, CMD_START_HAPTIC_CURSOR},
+         {"start", no_argument, &cmd, CMD_START_HAPTIC_CURSOR},
          {NULL,0,0,0}
         };
     char* shortopts = "vht:l:qb:";
@@ -176,14 +180,20 @@ int main(int argc, char* argv[])
             else if( cmd == CMD_SERIALNUMBER ) {
                 swprintf( serial_wstr, sizeof(serial_wstr), L"%s", optarg); // convert to wchar_t*
             }
+            else if( cmd == CMD_USAGEPAGE ) {
+                if( (usage_page = strtol(optarg,NULL,0)) == 0 ) { // if bad parse
+                    sscanf(optarg, "%4hx", &usage_page ); // try bare "ABCD"
+                }
+            }
             else if( cmd == CMD_LIST_DETAIL ) {
 
                 struct hid_device_info *devs, *cur_dev;
                 devs = hid_enumerate(0,0); // 0,0 = find all devices
                 cur_dev = devs;
                 while (cur_dev) {
-                    if((product_wstr[0]==L'\0' || wcscmp(cur_dev->product_string, product_wstr)==0) &&
-                       (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0)
+                    if( (!usage_page || cur_dev->usage_page == usage_page) &&
+                        (product_wstr[0]==L'\0' || wcscmp(cur_dev->product_string, product_wstr)==0) &&
+                        (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0)
                     ) {
                         printf("%04X/%04X: %ls - %ls\n",
                                 cur_dev->vendor_id, cur_dev->product_id,
@@ -191,7 +201,9 @@ int main(int argc, char* argv[])
                         if( cmd == CMD_LIST_DETAIL ) {
                             // printf("  vendorId:      0x%04hX\n", cur_dev->vendor_id);
                             // printf("  productId:     0x%04hX\n", cur_dev->product_id);
+                            printf("  usagePage:     0x%04hX\n", cur_dev->usage_page);
                             printf("  serial_number: %ls \n", cur_dev->serial_number);
+                            printf("  path: %s\n",cur_dev->path);
                             printf("\n");
                         }
                     }
@@ -205,10 +217,14 @@ int main(int argc, char* argv[])
                 devs = hid_enumerate(0, 0); // 0,0 = find all devices
                 cur_dev = devs;
                 while (cur_dev) {
-                    if((product_wstr[0]==L'\0' || wcscmp(cur_dev->product_string, product_wstr)==0) &&
-                       (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0)
+                    if( (!usage_page || cur_dev->usage_page == usage_page) &&
+                        (product_wstr[0]==L'\0' || wcscmp(cur_dev->product_string, product_wstr)==0) &&
+                        (serial_wstr[0]==L'\0' || wcscmp(cur_dev->serial_number, serial_wstr)==0)
                     ) {
                         strncpy(devpath, cur_dev->path, MAX_STR); // save it!
+                        printf("#### >> devpath: %s \n", devpath);
+                        // strncpy(devpath, "DevSrvsID:4308946121", MAX_STR); // save it!
+                        // printf("#### >> devpath: %s \n", devpath);
                     }
                     cur_dev = cur_dev->next;
                 }
