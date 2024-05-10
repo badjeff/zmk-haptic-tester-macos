@@ -30,7 +30,7 @@ manifest:
 - Add device to shield.overlay. `control-gpios` should wired to the base of a transistor that used to switch on and off of a [haptic actuators](https://blog.piezo.com/haptic-actuators-comparing-piezo-erm-lra#benders). Any eccentric rotating mass (ERM) motors, or linear resonant actuators (LRA) should work with a transistor.
 ```
 / {
-	lra0: haptic_generic_lra {
+	erm0: haptic_generic_erm0 {
 		compatible = "zmk,haptic-generic";
 		#haptic-binding-cells = <0>;
 		control-gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
@@ -45,10 +45,10 @@ manifest:
 ```
 / {
         behaviors {
-                lar0_hid: behavior_output_config_lar0_transport {
+                erm0_hid: behavior_output_config_erm0_transport {
                         compatible = "zmk,behavior-output-config";
                         #output-config-binding-cells = <0>; 
-                        device = <&lra0>;
+                        device = <&erm0>;
                         source = "transport";
                         // force = <0>;
 
@@ -75,7 +75,7 @@ manifest:
                         /*   Note: multi-behaviors is allowing */
                         /*   <&behaviors1 &behaviors1 &behaviors1> */
 
-                        output-config-bindings = <&lar0_hid>;
+                        output-config-bindings = <&erm0_hid>;
 
                         /* END -- Inject here */
                 };
